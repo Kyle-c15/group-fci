@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Club Red Packet Demo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --stage-width: min(100vw, 177.7778dvh);
+      --ink: #16140f;
+      --red: #f5263d;
+      --yellow: #fff1aa;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body { width: 100%; min-width: 320px; min-height: 100%; }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #121c3a;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+    }
+
+    button { font: inherit; cursor: pointer; }
+
+    .app {
+      width: 100vw;
+      min-height: 100dvh;
+      display: grid;
+      place-items: center;
+      background:
+        linear-gradient(90deg, rgba(5, 10, 31, .55), transparent 12%, transparent 88%, rgba(5, 10, 31, .55)),
+        #17264c;
+    }
+
+    .game-stage {
+      position: relative;
+      width: var(--stage-width);
+      aspect-ratio: 1083 / 609;
+      overflow: hidden;
+      isolation: isolate;
+      box-shadow: 0 18px 56px rgba(0, 0, 0, .42);
+      background: #2d55bf;
+    }
+
+    .scene {
+      position: absolute;
+      inset: 0;
+      background-position: center;
+      background-size: 100% 100%;
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(1.012);
+      transition: opacity 210ms ease, transform 310ms ease;
+    }
+
+    .scene.is-active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+    }
+
+    .scene.groups { background-image: url("assets/group-list.png"); }
+    .scene.lobby { background-image: url("assets/club-lobby.png"); }
+
+    .hotspot {
+      position: absolute;
+      display: block;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: transparent;
+      border-radius: 999px;
+    }
+
+    .hotspot:hover::after,
+    .hotspot:focus-visible::after {
+      content: "";
+      position: absolute;
+      inset: -3px;
+      border: 2px solid rgba(255, 255, 255, .96);
+      border-radius: inherit;
+      box-shadow: 0 0 0 4px rgba(255, 213, 29, .38);
+    }
+
+    .hotspot:focus-visible { outline: none; }
+
+    .enter-club {
+      left: 76.6%;
+      top: 35.6%;
+      width: 13.4%;
+      height: 11.2%;
+    }
+
+    .lobby-back {
+      z-index: 20;
+      left: 2.08%;
+      top: 1.15%;
+      width: 6%;
+      height: 9.2%;
+      border-radius: 12%;
+    }
+
+    .reward-layer {
+      position: absolute;
+      z-index: 10;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 130ms ease;
+    }
+
+    .reward-layer.show { opacity: 1; }
+
+    .reward-dim {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 11, 18, .33);
+      animation: dim-in 260ms ease-out both;
+    }
+
+    .packet-host {
+      position: relative;
+      z-index: 1;
+      width: 55%;
+      aspect-ratio: 1.245 / 1;
+      margin-top: 0;
+      overflow: visible;
+      transform-origin: 50% 48%;
+    }
+
+    .show .packet-host { animation: packet-window-in 520ms cubic-bezier(.18, .95, .28, 1.12) both; }
+
+    .packet-title {
+      display: none;
+    }
+
+    .packet-title::before,
+    .packet-title::after {
+      content: "";
+      display: inline-block;
+      width: .38em;
+      height: .38em;
+      margin: 0 .55em .18em;
+      border-radius: 1px;
+      background: #fc3442;
+      transform: rotate(25deg);
+      box-shadow: 0 0 7px rgba(252, 52, 66, .7);
+    }
+
+    .packet-stream { display: none; }
+
+    .reward-card {
+      position: absolute;
+      z-index: 3;
+      top: 12.4%;
+      left: 14.5%;
+      width: 71%;
+      height: 78%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 7.5% 8% 6%;
+      border: 2px solid #ff5f69;
+      border-radius: 3px;
+      color: #fff;
+      text-align: center;
+      background: var(--red);
+      box-shadow: 0 8px 12px rgba(67, 2, 7, .45), inset 0 1px rgba(255, 255, 255, .27);
+      pointer-events: auto;
+      transform: translateY(-12px) scale(.82);
+      opacity: 0;
+    }
+
+    .show .reward-card { animation: reward-card-in 500ms 180ms cubic-bezier(.17, 1.28, .35, 1) both; }
+
+    .reward-card::before {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border: 1px solid rgba(255, 255, 255, .13);
+      pointer-events: none;
+    }
+
+    .reward-card h1 {
+      position: relative;
+      margin: 0;
+      color: #fff9da;
+      font-size: clamp(18px, 2.6vw, 34px);
+      line-height: 1;
+      letter-spacing: 0;
+      text-shadow: 0 2px rgba(169, 4, 26, .45);
+    }
+
+    .offer-title {
+      position: relative;
+      margin: 3.5% 0 1%;
+      color: #ffe993;
+      font-size: clamp(13px, 1.7vw, 22px);
+      font-weight: 700;
+      line-height: 1.12;
+    }
+
+    .bonus-value {
+      position: relative;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      min-height: 31%;
+      margin-top: 1%;
+      font-weight: 900;
+      line-height: .72;
+    }
+
+    .rolling-number {
+      display: flex;
+      height: 1em;
+      overflow: hidden;
+      font-family: Arial Black, Impact, sans-serif;
+      font-size: clamp(68px, 10.2vw, 134px);
+      letter-spacing: 0;
+      line-height: 1;
+    }
+
+    .digit-window {
+      display: block;
+      width: .69em;
+      height: 1em;
+      overflow: hidden;
+    }
+
+    .digit-track {
+      display: block;
+      transform: translateY(0);
+    }
+
+    .digit-track i {
+      display: block;
+      height: 1em;
+      color: #fff;
+      font-family: Arial Black, Impact, sans-serif;
+      font-style: normal;
+      line-height: 1;
+    }
+
+    .show .digit-track.tens { animation: roll-tens 2100ms 420ms cubic-bezier(.12, .84, .18, 1) both; }
+    .show .digit-track.ones { animation: roll-ones 2250ms 450ms cubic-bezier(.12, .86, .18, 1) both; }
+
+    .bonus-value > .value-copy {
+      margin: 0 0 4% 5%;
+      color: #fffde8;
+      font-size: clamp(11px, 1.45vw, 19px);
+      font-weight: 800;
+      line-height: 1.02;
+      text-align: left;
+    }
+
+    .unlock-copy,
+    .offer-end {
+      position: relative;
+      width: 100%;
+      color: #ffe4e7;
+      font-size: clamp(12px, 1.55vw, 20px);
+      line-height: 1.25;
+      white-space: nowrap;
+    }
+
+    .unlock-copy { margin: 3.5% 0 0; }
+
+    .offer-end {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .45em;
+      margin: 4% 0 0;
+      color: #ffe4e7;
+      font-size: clamp(12px, 1.5vw, 20px);
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .offer-end time {
+      display: inline-flex;
+      align-items: center;
+      gap: .12em;
+      margin: 0;
+      color: #fffbe7;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .offer-end time span {
+      display: inline-grid;
+      min-width: 1.76em;
+      min-height: 1.35em;
+      place-items: center;
+      padding: .08em .16em;
+      border-radius: 2px;
+      color: #cf1830;
+      background: #fffbe7;
+      box-shadow: inset 0 -1px 0 rgba(158, 20, 31, .2);
+      font-size: 1.16em;
+      line-height: 1;
+    }
+
+    .offer-end time b {
+      color: #fffbe7;
+      font-size: 1.04em;
+      line-height: 1;
+    }
+
+    .claim-button {
+      position: relative;
+      width: 100%;
+      min-height: 16%;
+      margin-top: auto;
+      border: 1px solid #e4dcb5;
+      border-radius: 3px;
+      color: #7b3c21;
+      background: #fffbe3;
+      box-shadow: 0 2px 0 rgba(128, 17, 22, .45);
+      font-size: clamp(11px, 1.45vw, 19px);
+      font-weight: 900;
+    }
+
+    .claim-button:hover { background: #fff; transform: translateY(-1px); }
+    .claim-button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+
+    .packet-close {
+      position: absolute;
+      z-index: 4;
+      top: 91.5%;
+      left: 50%;
+      width: clamp(16px, 2.1vw, 28px);
+      aspect-ratio: 1;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      color: rgba(255, 255, 255, .86);
+      background: rgba(255, 255, 255, .12);
+      font-size: clamp(15px, 2vw, 25px);
+      line-height: 1;
+      pointer-events: auto;
+      transform: translateX(-50%);
+    }
+
+    .packet-close:hover { background: rgba(255, 255, 255, .23); }
+    .packet-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+    .burst {
+      position: absolute;
+      z-index: 2;
+      top: 47%;
+      left: 50%;
+      width: var(--piece-width, 7px);
+      height: var(--piece-height, 16px);
+      border-radius: var(--piece-radius, 1px);
+      opacity: 0;
+      background: var(--confetti, #ffdd39);
+      transform: translate(-50%, -50%);
+    }
+
+    .show .burst { animation: confetti-burst 820ms var(--delay, 250ms) cubic-bezier(.18, .69, .3, 1) both; }
+
+    @keyframes dim-in { from { opacity: 0; } to { opacity: 1; } }
+
+    @keyframes packet-window-in {
+      0% { opacity: 0; transform: scale(.86); }
+      63% { opacity: 1; transform: scale(1.018); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes reward-card-in {
+      0% { opacity: 0; transform: translateY(-22px) scale(.66) rotate(-2deg); }
+      68% { opacity: 1; transform: translateY(3px) scale(1.035) rotate(.5deg); }
+      100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+    }
+
+    @keyframes roll-tens {
+      from { transform: translateY(0); }
+      to { transform: translateY(-5em); }
+    }
+
+    @keyframes roll-ones {
+      from { transform: translateY(0); }
+      to { transform: translateY(-5em); }
+    }
+
+    @keyframes confetti-burst {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(.2) rotate(0); }
+      14% { opacity: 1; }
+      100% { opacity: 0; transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) rotate(var(--turn)); }
+    }
+
+    @media (max-aspect-ratio: 1 / 1) {
+      .game-stage { box-shadow: none; }
+      .app { background: #17264c; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="game-stage" aria-label="Club red packet interaction demo">
+      <section class="scene groups is-active" id="groups-view" aria-label="My Group">
+        <button class="hotspot enter-club" id="enter-club" aria-label="Enter unicah liza club">Enter</button>
+      </section>
+
+      <section class="scene lobby" id="lobby-view" aria-label="Club lobby">
+        <button class="hotspot lobby-back" id="lobby-back" aria-label="Return to My Group">Back</button>
+      </section>
+
+      <section class="reward-layer" id="reward-layer" aria-live="polite" aria-hidden="true">
+        <div class="reward-dim"></div>
+        <div class="packet-host" aria-label="Discount red packet">
+          <div class="packet-stream"></div>
+          <div class="packet-title">天降折扣</div>
+          <article class="reward-card">
+            <h1>SURPRISE BONUS</h1>
+            <div class="offer-title">LIMITED-TIME FIRST PURCHASE OFFER</div>
+            <div class="bonus-value">
+              <div class="rolling-number" aria-label="50">
+                <span class="digit-window" aria-hidden="true"><span class="digit-track tens"><i>0</i><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i></span></span>
+                <span class="digit-window" aria-hidden="true"><span class="digit-track ones"><i>0</i><i>7</i><i>4</i><i>9</i><i>1</i><i>0</i></span></span>
+              </div>
+              <span class="value-copy">FREE<br>CLUB CHIPS</span>
+            </div>
+            <div class="unlock-copy">Buy 100 Club Chips to unlock</div>
+            <div class="offer-end">
+              <span>Offer ends in</span>
+              <time aria-label="Offer ends in 29 hours, 57 minutes, 8 seconds">
+                <span id="offer-hours">29</span><b>:</b><span id="offer-minutes">57</span><b>:</b><span id="offer-seconds">08</span>
+              </time>
+            </div>
+            <button class="claim-button" id="claim-button" type="button">BUY NOW</button>
+          </article>
+          <button class="packet-close" id="packet-close" type="button" aria-label="Close red packet">×</button>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    const groupsView = document.getElementById('groups-view');
+    const lobbyView = document.getElementById('lobby-view');
+    const enterClub = document.getElementById('enter-club');
+    const lobbyBack = document.getElementById('lobby-back');
+    const rewardLayer = document.getElementById('reward-layer');
+    const claimButton = document.getElementById('claim-button');
+    const packetClose = document.getElementById('packet-close');
+    const offerHours = document.getElementById('offer-hours');
+    const offerMinutes = document.getElementById('offer-minutes');
+    const offerSecondsElement = document.getElementById('offer-seconds');
+    let rewardTimer;
+    let offerSeconds = (29 * 60 * 60) + (57 * 60) + 8;
+
+    const confetti = [
+      [-310, -160, '#ffde39', '40deg'], [-254, -243, '#fa3343', '130deg'], [-187, -278, '#fff2b1', '220deg'],
+      [-105, -305, '#2ce9d2', '315deg'], [-24, -322, '#ffdd39', '120deg'], [70, -302, '#ff4c59', '260deg'],
+      [153, -270, '#fff2a4', '170deg'], [235, -215, '#34d6ff', '95deg'], [302, -140, '#ffdc39', '255deg'],
+      [326, -42, '#fc414d', '330deg'], [307, 65, '#fff1a7', '120deg'], [240, 159, '#2ce9d2', '210deg'],
+      [152, 230, '#ffdb37', '290deg'], [52, 264, '#fa414d', '25deg'], [-62, 255, '#fff0a5', '185deg'],
+      [-164, 224, '#34d6ff', '65deg'], [-252, 162, '#ffdc39', '225deg'], [-319, 72, '#fc414d', '310deg'],
+      [-333, -36, '#fff0a5', '105deg'], [-278, -92, '#2ce9d2', '198deg'], [-92, -232, '#ffdb37', '275deg'],
+      [92, -238, '#fa414d', '20deg'], [224, -99, '#fff0a5', '160deg'], [286, 113, '#34d6ff', '45deg']
+    ];
+
+    confetti.forEach(([x, y, color, turn], index) => {
+      const piece = document.createElement('i');
+      piece.className = 'burst';
+      piece.style.setProperty('--tx', `${x}px`);
+      piece.style.setProperty('--ty', `${y}px`);
+      piece.style.setProperty('--turn', turn);
+      piece.style.setProperty('--confetti', color);
+      piece.style.setProperty('--delay', `${180 + (index % 5) * 36}ms`);
+      piece.style.setProperty('--piece-width', `${5 + (index % 3) * 2}px`);
+      piece.style.setProperty('--piece-height', `${9 + (index % 4) * 4}px`);
+      piece.style.setProperty('--piece-radius', index % 5 === 0 ? '50%' : '1px');
+      rewardLayer.appendChild(piece);
+    });
+
+    function hideReward() {
+      rewardLayer.classList.remove('show');
+      rewardLayer.setAttribute('aria-hidden', 'true');
+    }
+
+    function showReward() {
+      rewardLayer.classList.remove('show');
+      void rewardLayer.offsetWidth;
+      rewardLayer.classList.add('show');
+      rewardLayer.setAttribute('aria-hidden', 'false');
+    }
+
+    function goToLobby() {
+      clearTimeout(rewardTimer);
+      hideReward();
+      groupsView.classList.remove('is-active');
+      lobbyView.classList.add('is-active');
+      rewardTimer = window.setTimeout(showReward, 520);
+    }
+
+    function goToGroups() {
+      clearTimeout(rewardTimer);
+      hideReward();
+      lobbyView.classList.remove('is-active');
+      groupsView.classList.add('is-active');
+      enterClub.focus();
+    }
+
+    function renderOfferTimer() {
+      const hours = String(Math.floor(offerSeconds / 3600)).padStart(2, '0');
+      const minutes = String(Math.floor((offerSeconds % 3600) / 60)).padStart(2, '0');
+      const seconds = String(offerSeconds % 60).padStart(2, '0');
+      offerHours.textContent = hours;
+      offerMinutes.textContent = minutes;
+      offerSecondsElement.textContent = seconds;
+    }
+
+    enterClub.addEventListener('click', goToLobby);
+    lobbyBack.addEventListener('click', goToGroups);
+    claimButton.addEventListener('click', hideReward);
+    packetClose.addEventListener('click', hideReward);
+
+    renderOfferTimer();
+    window.setInterval(() => {
+      if (offerSeconds > 0) {
+        offerSeconds -= 1;
+        renderOfferTimer();
+      }
+    }, 1000);
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && lobbyView.classList.contains('is-active')) hideReward();
+    });
+  </script>
+</body>
+</html>
